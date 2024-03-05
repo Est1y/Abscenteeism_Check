@@ -99,7 +99,7 @@ class absenteeism_model():
         
         # predict the outputs and the probabilities and 
         # add columns with these values at the end of the new data
-        def predicted_outputs(self):
+    def predicted_outputs(self):
             if (self.data is not None):
                 self.preprocessed_data['Probability'] = self.reg.predict_proba(self.data)[:,1]
                 self.preprocessed_data ['Prediction'] = self.reg.predict(self.data)
