@@ -6,13 +6,12 @@ import numpy as np
 import pickle
 
 class CustomScaler(BaseEstimator, TransformerMixin): 
-       
     def __init__(self, columns_to_scale):
         self.scaler = StandardScaler()
         self.columns_to_scale = columns_to_scale
-        
-class Preprocessor(BaseEstimator, TransformerMixin):
+
     def fit(self, X, y=None):
+        self.scaler.fit(X[self.columns_to_scale])
         return self
 
     def transform(self, X, y=None):
@@ -26,19 +25,14 @@ class absenteeism_model():
             self.reg = pickle.load(model_file)
             self.scaler = pickle.load(scaler_file)
             self.data = None
-
-        self.pipe = Pipeline([
-           ('preprocessor', Preprocessor()),
-           ('scaler', CustomScaler(columns_to_scale)),
-        ])
-
+    
     def load_and_clean_data(self, data_file):
         df = pd.read_csv(data_file,delimiter=',')
+        print(df)
         self.df_with_predictions = df.copy()
         df = df.drop(['ID'], axis = 1)
         df['Absenteeism Time in Hours'] = 'NaN'
 
-        
         reason_columns = pd.get_dummies(df['Reason for Absence'], drop_first = True)
       
         Reason_1 = reason_columns.loc[:,1:14].max(axis=1)
@@ -83,35 +77,14 @@ class absenteeism_model():
         df = df.fillna(value=0)
         # drop the original absenteeism time
         df = df.drop(['Absenteeism Time in Hours'],axis=1)
-        
-            # drop the variables we decide we don't need
-        #df = df.drop(['Day of the Week','Daily Work Load Average','Distance to Work'],axis=1)
-            
-            # we have included this line of code if you want to call the 'preprocessed data'
-        #self.data= self.data .replace({False : 0, True :1})
-        self.preprocessed_data = df.copy()
-        print(self.scaler)
+        Unscaled_input = df.iloc[ :, : -1]
+        Unscaled_input.columns.values
+        columns_to_omit = ['Result_1', 'Result_2', 'Result_3', 'Result_4','Education']
+        columns_to_scale = [x for x in Unscaled_input.columns.values if x not in columns_to_omit]
 
-        self.data = self.pipe.transform(df)
+        self.pipe = Pipeline([
+            ('scaler', CustomScaler(columns_to_scale)),
+        ])
+        self.data = self.pipe.fit_transform(df)
+    
         return self.data.shape
-
-       # a function which outputs the probability of a data point to be 1
-    def predicted_probability(self):
-        if (self.data is not None):  
-            pred = self.reg.predict_proba(self.data)[:,1]
-            return pred
-        
-        # a function which outputs 0 or 1 based on our model
-    def predicted_output_category(self):
-        if (self.data is not None):
-            pred_outputs = self.reg.predict(self.data)
-            return pred_outputs
-        
-        # predict the outputs and the probabilities and 
-        # add columns with these values at the end of the new data
-    def predicted_outputs(self):
-        if (self.data is not None):
-            self.preprocessed_data['Probability'] = self.reg.predict_proba(self.data)[:,1]
-            self.preprocessed_data ['Prediction'] = self.reg.predict(self.data)
-            return self.preprocessed_data
-        
