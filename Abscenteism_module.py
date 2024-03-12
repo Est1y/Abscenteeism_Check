@@ -9,7 +9,7 @@ class CustomScaler(BaseEstimator, TransformerMixin):
     def __init__(self, columns_to_scale):
         self.scaler = StandardScaler()
         self.columns_to_scale = columns_to_scale
-
+      
     def fit(self, X, y=None):
         self.scaler.fit(X[self.columns_to_scale])
         return self
@@ -24,6 +24,7 @@ class absenteeism_model():
         with open('model','rb') as model_file, open('Scaler', 'rb') as scaler_file:
             self.reg = pickle.load(model_file)
             self.scaler = pickle.load(scaler_file)
+            self.preprocessed_data = None
             self.data = None
     
     def load_and_clean_data(self, data_file):
@@ -34,7 +35,7 @@ class absenteeism_model():
         df['Absenteeism Time in Hours'] = 'NaN'
 
         reason_columns = pd.get_dummies(df['Reason for Absence'], drop_first = True)
-      
+        reason_columns = reason_columns.replace({False : 0, True :1})
         Reason_1 = reason_columns.loc[:,1:14].max(axis=1)
         Reason_2 = reason_columns.loc[:,15:17].max(axis=1)
         Reason_3 = reason_columns.loc[:,18:21].max(axis=1)
@@ -79,12 +80,34 @@ class absenteeism_model():
         df = df.drop(['Absenteeism Time in Hours'],axis=1)
         Unscaled_input = df.iloc[ :, : -1]
         Unscaled_input.columns.values
-        columns_to_omit = ['Result_1', 'Result_2', 'Result_3', 'Result_4','Education']
+        columns_to_omit = ['Reason_1', 'Reason_2', 'Reason_3', 'Reason_4','Education']
         columns_to_scale = [x for x in Unscaled_input.columns.values if x not in columns_to_omit]
 
         self.pipe = Pipeline([
             ('scaler', CustomScaler(columns_to_scale)),
         ])
         self.data = self.pipe.fit_transform(df)
-    
-        return self.data.shape
+        print(self.data)
+        self.preprocessed_data = df.copy()
+        self.data = self.pipe.fit_transform(df)
+        return self.data
+   
+    def predicted_probability(self):
+        if (self.data is not None):  
+            pred = self.reg.predict_proba(self.data)[:,1]
+            return pred
+
+    def predicted_output_category(self):
+        if (self.data is not None):
+            pred_outputs = self.reg.predict(self.data)
+            return pred_outputs
+
+    def predicted_outputs(self):
+        if self.preprocessed_data is None:
+            print("You must call load_and_clean_data before calling predicted_outputs.")
+            return
+
+        self.preprocessed_data['Probability'] = self.reg.predict_proba(self.data)[:,1]
+        self.preprocessed_data['Prediction'] = self.reg.predict(self.data)
+        print(self.preprocessed_data)
+        return self.preprocessed_data
